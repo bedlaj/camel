@@ -18,6 +18,8 @@ package org.apache.camel.management.util;
 
 import java.io.IOException;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -61,19 +63,26 @@ public final class AvailablePortFinder {
     private AvailablePortFinder() {
         // Do nothing
     }
-    
+
     static {
         int port = MIN_PORT_NUMBER;
         ServerSocket ss = null;
 
         while (ss == null) {
             try {
-                ss = new ServerSocket(port);
+                ss = new ServerSocket();
+                ss.setReuseAddress(false);
+                ss.bind(new InetSocketAddress(InetAddress.getLocalHost(), port), 0);
             } catch (Exception e) {
+                close(ss);
                 ss = null;
                 port += 200;
+                if (port >= MAX_PORT_NUMBER) {
+                    throw new IllegalStateException("Cannot find port", e);
+                }
             }
-        } 
+        }
+
         LOCK = ss;
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
@@ -132,36 +141,40 @@ public final class AvailablePortFinder {
      * @return <tt>true</tt> if the port is available, or <tt>false</tt> if not
      * @throws IllegalArgumentException is thrown if the port number is out of range
      */
-    public static boolean available(int port) throws IllegalArgumentException {
+    public static synchronized boolean available(int port) throws IllegalArgumentException {
         if (port < currentMinPort.get() || port > MAX_PORT_NUMBER) {
             throw new IllegalArgumentException("Invalid start currentMinPort: " + port);
         }
 
-        ServerSocket ss = null;
-        DatagramSocket ds = null;
         try {
-            ss = new ServerSocket(port);
-            ss.setReuseAddress(true);
-            ds = new DatagramSocket(port);
-            ds.setReuseAddress(true);
-            return true;
-        } catch (IOException e) {
-            // Do nothing
-        } finally {
-            if (ds != null) {
-                ds.close();
+            ServerSocket ss = null;
+            InetAddress addr = InetAddress.getLocalHost();
+            try {
+                ss = new ServerSocket();
+                ss.setReuseAddress(false);
+                ss.bind(new InetSocketAddress(addr, port), 0);
+            } finally {
+                close(ss);
             }
 
-            if (ss != null) {
-                try {
-                    ss.close();
-                } catch (IOException e) {
-                    /* should not be thrown */
-                }
+            try (DatagramSocket ds = new DatagramSocket(null)) {
+                ds.setReuseAddress(false);
+                ds.bind(new InetSocketAddress(addr, port));
             }
+            return true;
+        } catch (IOException ignored) {
         }
 
         return false;
     }
 
+    private static void close(ServerSocket ss) {
+        if (ss != null) {
+            try {
+                ss.close();
+            } catch (IOException e) {
+                /* should not be thrown */
+            }
+        }
+    }
 }

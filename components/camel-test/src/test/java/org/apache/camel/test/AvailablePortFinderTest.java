@@ -16,6 +16,10 @@
  */
 package org.apache.camel.test;
 
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.MulticastSocket;
 import java.net.ServerSocket;
 
 import org.junit.Assert;
@@ -40,9 +44,29 @@ public class AvailablePortFinderTest {
 
 
     @Test
-    public void testNotAvailablePort() throws Exception {
+    public void testNotAvailableTcpPort() throws Exception {
         int p1 = AvailablePortFinder.getNextAvailable(11000);
         ServerSocket socket = new ServerSocket(p1);
+        int p2 = AvailablePortFinder.getNextAvailable(p1);
+        Assert.assertFalse("Port " + p1 + " Port2 " + p2, p1 == p2);
+        socket.close();
+    }
+
+    @Test
+    public void testNotAvailableUdpPort() throws Exception {
+        int p1 = AvailablePortFinder.getNextAvailable(11000);
+        DatagramSocket socket = new DatagramSocket(p1);
+        int p2 = AvailablePortFinder.getNextAvailable(p1);
+        Assert.assertFalse("Port " + p1 + " Port2 " + p2, p1 == p2);
+        socket.close();
+    }
+
+    @Test
+    public void testNotAvailableMulticastPort() throws Exception {
+        int p1 = AvailablePortFinder.getNextAvailable(11000);
+        MulticastSocket socket = new MulticastSocket(null);
+        socket.setReuseAddress(false); // true is default for MulticastSocket, we wan to fail if port is occupied
+        socket.bind(new InetSocketAddress(InetAddress.getLocalHost(), p1));
         int p2 = AvailablePortFinder.getNextAvailable(p1);
         Assert.assertFalse("Port " + p1 + " Port2 " + p2, p1 == p2);
         socket.close();

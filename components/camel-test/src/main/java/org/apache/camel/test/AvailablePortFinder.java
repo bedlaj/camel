@@ -63,19 +63,26 @@ public final class AvailablePortFinder {
     private AvailablePortFinder() {
         // Do nothing
     }
-    
+
     static {
         int port = MIN_PORT_NUMBER;
         ServerSocket ss = null;
 
         while (ss == null) {
             try {
-                ss = new ServerSocket(port);
+                ss = new ServerSocket();
+                ss.setReuseAddress(false);
+                ss.bind(new InetSocketAddress(InetAddress.getLocalHost(), port), 0);
             } catch (Exception e) {
+                close(ss);
                 ss = null;
                 port += 200;
+                if (port >= MAX_PORT_NUMBER) {
+                    throw new IllegalStateException("Cannot find port", e);
+                }
             }
-        } 
+        }
+
         LOCK = ss;
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
@@ -139,33 +146,35 @@ public final class AvailablePortFinder {
             throw new IllegalArgumentException("Invalid start currentMinPort: " + port);
         }
 
-
-
         try {
             ServerSocket ss = null;
             InetAddress addr = InetAddress.getLocalHost();
-                try {
-                    ss = new ServerSocket();
-                    ss.setReuseAddress(false);
-                    ss.bind(new InetSocketAddress(addr, port), 0);
-                } finally {
-                    if (ss != null) {
-                        try {
-                            ss.close();
-                        } catch (IOException e) {
-                            /* should not be thrown */
-                        }
-                    }
-                }
+            try {
+                ss = new ServerSocket();
+                ss.setReuseAddress(false);
+                ss.bind(new InetSocketAddress(addr, port), 0);
+            } finally {
+                close(ss);
+            }
 
-                try (DatagramSocket ds = new DatagramSocket(null)) {
-                    ds.setReuseAddress(false);
-                    ds.bind(new InetSocketAddress(addr, port));
-                }
+            try (DatagramSocket ds = new DatagramSocket(null)) {
+                ds.setReuseAddress(false);
+                ds.bind(new InetSocketAddress(addr, port));
+            }
             return true;
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (IOException ignored) {
         }
+
         return false;
+    }
+
+    private static void close(ServerSocket ss) {
+        if (ss != null) {
+            try {
+                ss.close();
+            } catch (IOException e) {
+                /* should not be thrown */
+            }
+        }
     }
 }
