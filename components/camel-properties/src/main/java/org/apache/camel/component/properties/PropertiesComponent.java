@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.camel.CamelContextAware;
@@ -122,6 +123,9 @@ public class PropertiesComponent extends DefaultComponent implements org.apache.
     private int systemPropertiesMode = SYSTEM_PROPERTIES_MODE_OVERRIDE;
     @Metadata(defaultValue = "" + ENVIRONMENT_VARIABLES_MODE_OVERRIDE, enums = "0,1,2")
     private int environmentVariableMode = ENVIRONMENT_VARIABLES_MODE_OVERRIDE;
+    @Metadata(defaultValue = "true")
+    private boolean autoDiscoverPropertiesSources = true;
+
 
     public PropertiesComponent() {
         super();
@@ -176,6 +180,9 @@ public class PropertiesComponent extends DefaultComponent implements org.apache.
 
     @Override
     public Properties loadProperties() {
+        // this method may be replaced by loadProperties(k -> true) but the underlying sources
+        // may have some optimization for bulk load so let's keep it
+
         Properties prop = new OrderedProperties();
 
         // use initial properties
@@ -184,7 +191,11 @@ public class PropertiesComponent extends DefaultComponent implements org.apache.
         }
 
         if (!sources.isEmpty()) {
-            for (PropertiesSource ps : sources) {
+            // sources are ordered according to {@link org.apache.camel.support.OrderComparator} so
+            // it is needed to iterate them in reverse order otherwise lower priority sources may
+            // override properties from higher priority ones
+            for (int i = sources.size(); i-- > 0; ) {
+                PropertiesSource ps = sources.get(i);
                 if (ps instanceof LoadablePropertiesSource) {
                     LoadablePropertiesSource lps = (LoadablePropertiesSource) ps;
                     Properties p = lps.loadProperties();
@@ -200,6 +211,45 @@ public class PropertiesComponent extends DefaultComponent implements org.apache.
             override.putAll(prop);
             override.putAll(overrideProperties);
             prop = override;
+        }
+
+        return prop;
+    }
+
+    @Override
+    public Properties loadProperties(Predicate<String> filter) {
+        Properties prop = new OrderedProperties();
+
+        // use initial properties
+        if (initialProperties != null) {
+            for (String name: initialProperties.stringPropertyNames()) {
+                if (filter.test(name)) {
+                    prop.put(name, initialProperties.get(name));
+                }
+            }
+        }
+
+        if (!sources.isEmpty()) {
+            // sources are ordered according to {@link org.apache.camel.support.OrderComparator} so
+            // it is needed to iterate them in reverse order otherwise lower priority sources may
+            // override properties from higher priority ones
+            for (int i = sources.size(); i-- > 0; ) {
+                PropertiesSource ps = sources.get(i);
+                if (ps instanceof LoadablePropertiesSource) {
+                    LoadablePropertiesSource lps = (LoadablePropertiesSource) ps;
+                    Properties p = lps.loadProperties(filter);
+                    prop.putAll(p);
+                }
+            }
+        }
+
+        // use override properties
+        if (overrideProperties != null) {
+            for (String name: overrideProperties.stringPropertyNames()) {
+                if (filter.test(name)) {
+                    prop.put(name, overrideProperties.get(name));
+                }
+            }
         }
 
         return prop;
@@ -351,7 +401,14 @@ public class PropertiesComponent extends DefaultComponent implements org.apache.
         this.ignoreMissingLocation = ignoreMissingLocation;
     }
 
+    /**
+     * @return a list of properties which will be used before any locations are resolved (can't be null).
+     */
     public Properties getInitialProperties() {
+        if (initialProperties == null) {
+            initialProperties = new Properties();
+        }
+
         return initialProperties;
     }
 
@@ -363,7 +420,14 @@ public class PropertiesComponent extends DefaultComponent implements org.apache.
         this.initialProperties = initialProperties;
     }
 
+    /**
+     * @return a list of properties that take precedence and will use first, if a property exist (can't be null).
+     */
     public Properties getOverrideProperties() {
+        if (overrideProperties == null) {
+            overrideProperties = new Properties();
+        }
+
         return overrideProperties;
     }
 
@@ -439,6 +503,17 @@ public class PropertiesComponent extends DefaultComponent implements org.apache.
         this.environmentVariableMode = environmentVariableMode;
     }
 
+    public boolean isAutoDiscoverPropertiesSources() {
+        return autoDiscoverPropertiesSources;
+    }
+
+    /**
+     * Whether to automatically discovery instances of {@link PropertiesSource} from registry and service factory.
+     */
+    public void setAutoDiscoverPropertiesSources(boolean autoDiscoverPropertiesSources) {
+        this.autoDiscoverPropertiesSources = autoDiscoverPropertiesSources;
+    }
+
     @Override
     public void addPropertiesSource(PropertiesSource propertiesSource) {
         if (propertiesSource instanceof CamelContextAware) {
@@ -459,24 +534,31 @@ public class PropertiesComponent extends DefaultComponent implements org.apache.
     protected void doInit() throws Exception {
         super.doInit();
 
-        // discover any 3rd party properties sources
-        try {
-            FactoryFinder factoryFinder = getCamelContext().adapt(ExtendedCamelContext.class).getFactoryFinder("META-INF/services/org/apache/camel");
-            Class<?> type = factoryFinder.findClass("properties-source-factory").orElse(null);
-            if (type != null) {
-                Object obj = getCamelContext().getInjector().newInstance(type, false);
-                if (obj instanceof PropertiesSource) {
-                    PropertiesSource ps = (PropertiesSource) obj;
-                    addPropertiesSource(ps);
-                    LOG.info("PropertiesComponent added custom PropertiesSource: {}", ps);
-                } else if (obj != null) {
-                    LOG.warn("PropertiesComponent cannot add custom PropertiesSource as the type is not a org.apache.camel.component.properties.PropertiesSource but: " + type.getName());
+        if (isAutoDiscoverPropertiesSources()) {
+            // discover any 3rd party properties sources
+            try {
+                for (PropertiesSource source : getCamelContext().getRegistry().findByType(PropertiesSource.class)) {
+                    addPropertiesSource(source);
+                    LOG.info("PropertiesComponent added custom PropertiesSource (registry): {}", source);
                 }
+
+                FactoryFinder factoryFinder = getCamelContext().adapt(ExtendedCamelContext.class).getFactoryFinder("META-INF/services/org/apache/camel/");
+                Class<?> type = factoryFinder.findClass("properties-source-factory").orElse(null);
+                if (type != null) {
+                    Object obj = getCamelContext().getInjector().newInstance(type, false);
+                    if (obj instanceof PropertiesSource) {
+                        PropertiesSource ps = (PropertiesSource) obj;
+                        addPropertiesSource(ps);
+                        LOG.info("PropertiesComponent added custom PropertiesSource (factory): {}", ps);
+                    } else if (obj != null) {
+                        LOG.warn("PropertiesComponent cannot add custom PropertiesSource as the type is not a org.apache.camel.component.properties.PropertiesSource but: " + type.getName());
+                    }
+                }
+            } catch (NoFactoryAvailableException e) {
+                // ignore
+            } catch (Exception e) {
+                LOG.debug("Error discovering and using custom PropertiesSource due to " + e.getMessage() + ". This exception is ignored", e);
             }
-        } catch (NoFactoryAvailableException e) {
-            // ignore
-        } catch (Exception e) {
-            LOG.debug("Error discovering and using custom PropertiesSource due to " + e.getMessage() + ". This exception is ignored", e);
         }
 
         ServiceHelper.initService(sources);
