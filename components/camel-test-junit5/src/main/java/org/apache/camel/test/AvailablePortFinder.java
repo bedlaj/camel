@@ -17,10 +17,9 @@
 package org.apache.camel.test;
 
 import java.io.IOException;
-import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.util.NoSuchElementException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
