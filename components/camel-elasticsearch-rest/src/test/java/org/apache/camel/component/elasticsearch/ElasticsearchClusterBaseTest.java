@@ -41,7 +41,7 @@ public class ElasticsearchClusterBaseTest extends CamelTestSupport {
     public static RestHighLevelClient client;
 
     protected static final int ES_BASE_HTTP_PORT = AvailablePortFinder.getNextAvailable();
-    protected static final int ES_FIRST_NODE_TRANSPORT_PORT = AvailablePortFinder.getNextAvailable(ES_BASE_HTTP_PORT + 1);
+    protected static final int ES_FIRST_NODE_TRANSPORT_PORT = AvailablePortFinder.getNextAvailable();
 
     @SuppressWarnings("resource")
     @BeforeClass

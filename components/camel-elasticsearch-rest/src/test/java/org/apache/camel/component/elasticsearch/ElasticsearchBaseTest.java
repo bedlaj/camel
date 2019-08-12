@@ -40,7 +40,7 @@ public class ElasticsearchBaseTest extends CamelTestSupport {
     public static RestClient client;
 
     protected static final int ES_BASE_TRANSPORT_PORT = AvailablePortFinder.getNextAvailable();
-    protected static final int ES_BASE_HTTP_PORT = AvailablePortFinder.getNextAvailable(ES_BASE_TRANSPORT_PORT + 1);
+    protected static final int ES_BASE_HTTP_PORT = AvailablePortFinder.getNextAvailable();
 
     @SuppressWarnings("resource")
     @BeforeClass

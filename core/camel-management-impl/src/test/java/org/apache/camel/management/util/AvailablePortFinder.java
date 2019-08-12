@@ -17,12 +17,9 @@
 package org.apache.camel.management.util;
 
 import java.io.IOException;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.util.NoSuchElementException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,30 +29,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class AvailablePortFinder {
 
-    /**
-     * The minimum server currentMinPort number for IPv4.
-     * Set at 1100 to avoid returning privileged currentMinPort numbers.
-     */
-    public static final int MIN_PORT_NUMBER = 1100;
-
-    /**
-     * The maximum server currentMinPort number for IPv4.
-     */
-    public static final int MAX_PORT_NUMBER = 65535;
-
     private static final Logger LOG = LoggerFactory.getLogger(AvailablePortFinder.class);
-
-    /**
-     * We'll hold open the lowest port in this process
-     * so parallel processes won't use the same block
-     * of ports.   They'll go up to the next block.
-     */
-    private static final ServerSocket LOCK;
-
-    /**
-     * Incremented to the next lowest available port when getNextAvailable() is called.
-     */
-    private static AtomicInteger currentMinPort = new AtomicInteger(MIN_PORT_NUMBER);
 
     /**
      * Creates a new instance.
@@ -64,117 +38,21 @@ public final class AvailablePortFinder {
         // Do nothing
     }
 
-    static {
-        int port = MIN_PORT_NUMBER;
-        ServerSocket ss = null;
-
-        while (ss == null) {
-            try {
-                ss = new ServerSocket();
-                ss.setReuseAddress(false);
-                ss.bind(new InetSocketAddress(InetAddress.getLocalHost(), port), 0);
-            } catch (Exception e) {
-                close(ss);
-                ss = null;
-                port += 200;
-                if (port >= MAX_PORT_NUMBER) {
-                    throw new IllegalStateException("Cannot find port", e);
-                }
-            }
-        }
-
-        LOCK = ss;
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-            public void run() {
-                try {
-                    LOCK.close();
-                } catch (Exception ex) {
-                    //ignore
-                }
-            }
-        });
-        currentMinPort.set(port + 1);
-    }
-
     /**
-     * Gets the next available port starting at the lowest number. This is the preferred
-     * method to use. The port return is immediately marked in use and doesn't rely on the caller actually opening
-     * the port.
+     * Gets the next available port.
      *
-     * @throws IllegalArgumentException is thrown if the port number is out of range
-     * @throws NoSuchElementException if there are no ports available
+     * @throws IllegalStateException if there are no ports available
      * @return the available port
      */
-    public static synchronized int getNextAvailable() {
-        int next = getNextAvailable(currentMinPort.get());
-        currentMinPort.set(next + 1);
-        return next;
-    }
-
-    /**
-     * Gets the next available port starting at a given from port.
-     *
-     * @param fromPort the from port to scan for availability
-     * @throws IllegalArgumentException is thrown if the port number is out of range
-     * @throws NoSuchElementException if there are no ports available
-     * @return the available port
-     */
-    public static synchronized int getNextAvailable(int fromPort) {
-        if (fromPort < currentMinPort.get() || fromPort > MAX_PORT_NUMBER) {
-            throw new IllegalArgumentException("From port number not in valid range: " + fromPort);
-        }
-
-        for (int i = fromPort; i <= MAX_PORT_NUMBER; i++) {
-            if (available(i)) {
-                LOG.info("getNextAvailable({}) -> {}", fromPort, i);
-                return i;
-            }
-        }
-
-        throw new NoSuchElementException("Could not find an available port above " + fromPort);
-    }
-
-    /**
-     * Checks to see if a specific port is available.
-     *
-     * @param port the port number to check for availability
-     * @return <tt>true</tt> if the port is available, or <tt>false</tt> if not
-     * @throws IllegalArgumentException is thrown if the port number is out of range
-     */
-    public static boolean available(int port) throws IllegalArgumentException {
-        if (port < currentMinPort.get() || port > MAX_PORT_NUMBER) {
-            throw new IllegalArgumentException("Invalid start currentMinPort: " + port);
-        }
-
-        try {
-            ServerSocket ss = null;
-            InetAddress addr = InetAddress.getLocalHost();
-            try {
-                ss = new ServerSocket();
-                ss.setReuseAddress(false);
-                ss.bind(new InetSocketAddress(addr, port), 0);
-            } finally {
-                close(ss);
-            }
-
-            try (DatagramSocket ds = new DatagramSocket(null)) {
-                ds.setReuseAddress(false);
-                ds.bind(new InetSocketAddress(addr, port));
-            }
-            return true;
-        } catch (IOException ignored) {
-        }
-
-        return false;
-    }
-
-    private static void close(ServerSocket ss) {
-        if (ss != null) {
-            try {
-                ss.close();
-            } catch (IOException e) {
-                /* should not be thrown */
-            }
+    public static int getNextAvailable() {
+        try (ServerSocket ss = new ServerSocket()) {
+            ss.setReuseAddress(true);
+            ss.bind(new InetSocketAddress((InetAddress) null, 0), 1);
+            int port = ss.getLocalPort();
+            LOG.info("getNextAvailable() -> {}", port);
+            return port;
+        } catch (IOException e) {
+            throw new IllegalStateException("Cannot find free port", e);
         }
     }
 }

@@ -28,58 +28,32 @@ import org.junit.Test;
 public class AvailablePortFinderTest {
 
     @Test
-    public void getNextAvailablePort() throws Exception {
-        int p1 = AvailablePortFinder.getNextAvailable();
-        int p2 = AvailablePortFinder.getNextAvailable();
-        Assert.assertFalse("Port " + p1 + " Port2 " + p2, p1 == p2);
-    }
-
-    @Test
-    public void testGetNextAvailablePortInt() throws Exception {
-        int p1 = AvailablePortFinder.getNextAvailable(9123);
-        int p2 = AvailablePortFinder.getNextAvailable(9123);
-        // these calls only check availability but don't mark the port as in use.
-        Assert.assertEquals(p1, p2);
-    }
-
-
-    @Test
     public void testNotAvailableTcpPort() throws Exception {
-        int p1 = AvailablePortFinder.getNextAvailable(11000);
+        int p1 = AvailablePortFinder.getNextAvailable();
         ServerSocket socket = new ServerSocket(p1);
-        int p2 = AvailablePortFinder.getNextAvailable(p1);
+        int p2 = AvailablePortFinder.getNextAvailable();
         Assert.assertFalse("Port " + p1 + " Port2 " + p2, p1 == p2);
         socket.close();
     }
 
     @Test
     public void testNotAvailableUdpPort() throws Exception {
-        int p1 = AvailablePortFinder.getNextAvailable(11000);
+        int p1 = AvailablePortFinder.getNextAvailable();
         DatagramSocket socket = new DatagramSocket(p1);
-        int p2 = AvailablePortFinder.getNextAvailable(p1);
+        int p2 = AvailablePortFinder.getNextAvailable();
         Assert.assertFalse("Port " + p1 + " Port2 " + p2, p1 == p2);
         socket.close();
     }
 
     @Test
     public void testNotAvailableMulticastPort() throws Exception {
-        int p1 = AvailablePortFinder.getNextAvailable(11000);
+        int p1 = AvailablePortFinder.getNextAvailable();
         MulticastSocket socket = new MulticastSocket(null);
         socket.setReuseAddress(false); // true is default for MulticastSocket, we wan to fail if port is occupied
         socket.bind(new InetSocketAddress(InetAddress.getLocalHost(), p1));
-        int p2 = AvailablePortFinder.getNextAvailable(p1);
+        int p2 = AvailablePortFinder.getNextAvailable();
         Assert.assertFalse("Port " + p1 + " Port2 " + p2, p1 == p2);
         socket.close();
-    }
-
-    @Test (expected = IllegalArgumentException.class)
-    public void getMinOutOfRangePort() throws Exception {
-        AvailablePortFinder.getNextAvailable(AvailablePortFinder.MIN_PORT_NUMBER - 1);
-    }
-
-    @Test (expected = IllegalArgumentException.class)
-    public void getMaxOutOfRangePort() throws Exception {
-        AvailablePortFinder.getNextAvailable(AvailablePortFinder.MAX_PORT_NUMBER + 1);
     }
 
 }

@@ -25,7 +25,7 @@ public class BaseServerTestSupport extends CamelTestSupport {
 
     @BeforeClass
     public static void initPort() throws Exception {
-        port = AvailablePortFinder.getNextAvailable(21000);
+        port = AvailablePortFinder.getNextAvailable();
     }
 
     protected int getPort() {

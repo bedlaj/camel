@@ -45,8 +45,8 @@ public class Http4RouteTest extends CamelTestSupport {
     
     @Override
     protected RouteBuilder createRouteBuilder() throws Exception {
-        port1 = AvailablePortFinder.getNextAvailable(8000);
-        port2 = AvailablePortFinder.getNextAvailable(9000);
+        port1 = AvailablePortFinder.getNextAvailable();
+        port2 = AvailablePortFinder.getNextAvailable();
         return new RouteBuilder() {
             @Override
             public void configure() throws Exception {
