@@ -92,7 +92,7 @@ public class NettyHttpGetWithInvalidMessageTest extends CamelTestSupport {
         return new RouteBuilder() {
             @Override
             public void configure() throws Exception {
-                port1 = AvailablePortFinder.getNextAvailable(8100);
+                port1 = AvailablePortFinder.getNextAvailable();
                 
                // set up a netty http proxy
                 from("netty-http:http://localhost:" + port1 + "/test")
