@@ -51,6 +51,9 @@ public class ElasticsearchClusterBaseTest extends CamelTestSupport {
         // create runner instance
 
         runner = new ElasticsearchClusterRunner();
+        runner.setMaxHttpPort(-1);
+        runner.setMaxTransportPort(-1);
+
         // create ES nodes
         runner.onBuild((number, settingsBuilder) -> {
             settingsBuilder.put("http.cors.enabled", true);
@@ -58,12 +61,13 @@ public class ElasticsearchClusterBaseTest extends CamelTestSupport {
         }).build(newConfigs()
                  .clusterName(clusterName)
                  .numOfNode(1)
-                 .baseHttpPort(ES_BASE_HTTP_PORT)
+                 .baseHttpPort(ES_BASE_HTTP_PORT - 1) // ElasticsearchClusterRunner add node id to port, so set it to ES_BASE_HTTP_PORT-1 to start node 1 exactly on ES_BASE_HTTP_PORT
+                 .baseTransportPort(ES_FIRST_NODE_TRANSPORT_PORT - 1) // ElasticsearchClusterRunner add node id to port, so set it to ES_FIRST_NODE_TRANSPORT_PORT-1 to start node 1 exactly on ES_FIRST_NODE_TRANSPORT_PORT
                  .basePath("target/testcluster/"));
 
         // wait for green status
         runner.ensureGreen();
-        restclientbuilder = RestClient.builder(new HttpHost(InetAddress.getByName("127.0.0.1"), ES_FIRST_NODE_TRANSPORT_PORT));
+        restclientbuilder = RestClient.builder(new HttpHost(InetAddress.getByName("127.0.0.1"), ES_BASE_HTTP_PORT));
         client = new RestHighLevelClient(restclientbuilder);
         restClient = client.getLowLevelClient();
     }

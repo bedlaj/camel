@@ -44,7 +44,7 @@ public class BaseNettyTest extends CamelTestSupport {
 
     private static volatile int port;
 
-    @Before
+    @BeforeClass
     public static void initPort() throws Exception {
         port = AvailablePortFinder.getNextAvailable();
     }
