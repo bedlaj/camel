@@ -18,14 +18,16 @@ package org.apache.camel.component.file.remote;
 
 import org.apache.camel.test.AvailablePortFinder;
 import org.apache.camel.test.junit4.CamelTestSupport;
-import org.junit.BeforeClass;
+import org.junit.Before;
 
 public class BaseServerTestSupport extends CamelTestSupport {
-    protected static int port;
+    protected int port;
 
-    @BeforeClass
-    public static void initPort() throws Exception {
+    @Before
+    @Override
+    public void setUp() throws Exception {
         port = AvailablePortFinder.getNextAvailable();
+        super.setUp();
     }
 
     protected int getPort() {
