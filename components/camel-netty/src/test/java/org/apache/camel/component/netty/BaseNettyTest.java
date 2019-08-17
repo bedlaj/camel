@@ -32,6 +32,7 @@ import org.apache.camel.test.AvailablePortFinder;
 import org.apache.camel.test.junit4.CamelTestSupport;
 import org.apache.logging.log4j.core.LogEvent;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,32 +47,7 @@ public class BaseNettyTest extends CamelTestSupport {
 
     @BeforeClass
     public static void initPort() throws Exception {
-        File file = new File("target/nettyport.txt");
-
-        if (!file.exists()) {
-            // start from somewhere in the 25xxx range
-            port = AvailablePortFinder.getNextAvailable(25000);
-        } else {
-            // read port number from file
-            String s = IOConverter.toString(file, null);
-            port = Integer.parseInt(s);
-            // use next free port
-            port = AvailablePortFinder.getNextAvailable(port + 1);
-        }
-
-    }
-
-    @AfterClass
-    public static void savePort() throws Exception {
-        File file = new File("target/nettyport.txt");
-
-        // save to file, do not append
-        FileOutputStream fos = new FileOutputStream(file, false);
-        try {
-            fos.write(String.valueOf(port).getBytes());
-        } finally {
-            fos.close();
-        }
+        port = AvailablePortFinder.getNextAvailable();
     }
 
     @BeforeClass
@@ -116,7 +92,7 @@ public class BaseNettyTest extends CamelTestSupport {
     }
 
     protected int getNextPort() {
-        port = AvailablePortFinder.getNextAvailable(port + 1);
+        port = AvailablePortFinder.getNextAvailable();
         return port;
     }
 

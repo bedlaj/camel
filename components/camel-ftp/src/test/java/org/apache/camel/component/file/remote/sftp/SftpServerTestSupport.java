@@ -40,6 +40,9 @@ import org.junit.Before;
 public class SftpServerTestSupport extends BaseServerTestSupport {
 
     protected static final String FTP_ROOT_DIR = "target/res/home";
+    private static final String KNOWN_HOSTS = "[localhost]:%d ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQDdfIWeSV4o68dRrKS" +
+            "zFd/Bk51E65UTmmSrmW0O1ohtzi6HzsDPjXgCtlTt3FqTcfFfI92IlTr4JWqC9UK1QT1ZTeng0MkPQmv68hDANHbt5CpETZHjW5q4OOgWhV" +
+            "vj5IyOC2NZHtKlJBkdsMAa15ouOOJLzBvAvbqOR/yUROsEiQ==";
     protected SshServer sshd;
     protected boolean canTest;
     protected String oldUserHome;
@@ -60,9 +63,9 @@ public class SftpServerTestSupport extends BaseServerTestSupport {
         createDirectory(simulatedUserHome);
         createDirectory(simulatedUserSsh);
 
-        FileUtils.copyInputStreamToFile(getClass().getClassLoader().getResourceAsStream("known_hosts"), new File(simulatedUserSsh + "/known_hosts"));
-
         super.setUp();
+
+        FileUtils.writeByteArrayToFile(new File(simulatedUserSsh + "/known_hosts"), buildKnownHosts());
 
         setUpServer();
     }
@@ -139,5 +142,9 @@ public class SftpServerTestSupport extends BaseServerTestSupport {
         for (AbstractSession session : sessions) {
             session.disconnect(4, "dummy");
         }
+    }
+
+    protected byte[] buildKnownHosts() {
+        return String.format(KNOWN_HOSTS, port).getBytes();
     }
 }
