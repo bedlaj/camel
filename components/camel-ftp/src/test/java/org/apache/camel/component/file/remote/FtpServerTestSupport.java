@@ -52,6 +52,15 @@ public abstract class FtpServerTestSupport extends BaseServerTestSupport {
         deleteDirectory(FTP_ROOT_DIR);
 
         canTest = false;
+        initPort();
+        FtpServerFactory factory = createFtpServerFactory();
+        if (factory != null) {
+            ftpServer = factory.createServer();
+            if (ftpServer != null) {
+                ftpServer.start();
+                canTest = true;
+            }
+        }
 
         try {
             super.setUp();
@@ -69,17 +78,6 @@ public abstract class FtpServerTestSupport extends BaseServerTestSupport {
                 throw e;
             }
         }
-
-        FtpServerFactory factory = createFtpServerFactory();
-        if (factory != null) {
-            ftpServer = factory.createServer();
-            if (ftpServer != null) {
-                ftpServer.start();
-                canTest = true;
-            }
-        }
-
-
     }
 
     @Override
@@ -115,10 +113,10 @@ public abstract class FtpServerTestSupport extends BaseServerTestSupport {
         pumf.setPasswordEncryptor(new ClearTextPasswordEncryptor());
         pumf.setFile(USERS_FILE);
         UserManager userMgr = pumf.createUserManager();
-        
+
         ListenerFactory factory = new ListenerFactory();
         factory.setPort(getPort());
-        
+
         FtpServerFactory serverFactory = new FtpServerFactory();
         serverFactory.setUserManager(userMgr);
         serverFactory.setFileSystem(fsf);

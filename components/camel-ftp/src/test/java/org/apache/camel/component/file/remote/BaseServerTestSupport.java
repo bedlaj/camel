@@ -23,11 +23,16 @@ import org.junit.Before;
 public class BaseServerTestSupport extends CamelTestSupport {
     protected int port;
 
+    private boolean portInitialized = false;
+
     @Before
-    @Override
-    public void setUp() throws Exception {
-        port = AvailablePortFinder.getNextAvailable();
-        super.setUp();
+    public void initPort() throws Exception {
+        if (!portInitialized) {
+            // call only once per test method (Some tests can call this method manually in setUp method,
+            // which is called before this if setUp method is overridden)
+            port = AvailablePortFinder.getNextAvailable();
+            portInitialized = true;
+        }
     }
 
     protected int getPort() {
