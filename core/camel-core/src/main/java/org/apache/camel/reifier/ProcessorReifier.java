@@ -113,7 +113,9 @@ public abstract class ProcessorReifier<T extends ProcessorDefinition<?>> {
 
     private static final Map<Class<?>, Function<ProcessorDefinition<?>, ProcessorReifier<? extends ProcessorDefinition<?>>>> PROCESSORS;
     static {
-        Map<Class<?>, Function<ProcessorDefinition<?>, ProcessorReifier<? extends ProcessorDefinition<?>>>> map = new HashMap<>();
+        // NOTE: if adding a new class then update the initial capacity of the HashMap
+        Map<Class<?>, Function<ProcessorDefinition<?>, ProcessorReifier<? extends ProcessorDefinition<?>>>> map
+                = new HashMap<>(65);
         map.put(AggregateDefinition.class, AggregateReifier::new);
         map.put(BeanDefinition.class, BeanReifier::new);
         map.put(CatchDefinition.class, CatchReifier::new);
@@ -446,9 +448,6 @@ public abstract class ProcessorReifier<T extends ProcessorDefinition<?>> {
             // resolve properties before we create the processor
             ProcessorDefinitionHelper.resolvePropertyPlaceholders(routeContext.getCamelContext(), output);
 
-            // resolve constant fields (eg Exchange.FILE_NAME)
-            ProcessorDefinitionHelper.resolveKnownConstantFields(routeContext.getCamelContext(), output);
-
             // also resolve properties and constant fields on embedded expressions
             ProcessorDefinition<?> me = (ProcessorDefinition<?>) output;
             if (me instanceof ExpressionNode) {
@@ -457,9 +456,6 @@ public abstract class ProcessorReifier<T extends ProcessorDefinition<?>> {
                 if (expressionDefinition != null) {
                     // resolve properties before we create the processor
                     ProcessorDefinitionHelper.resolvePropertyPlaceholders(routeContext.getCamelContext(), expressionDefinition);
-
-                    // resolve constant fields (eg Exchange.FILE_NAME)
-                    ProcessorDefinitionHelper.resolveKnownConstantFields(routeContext.getCamelContext(), expressionDefinition);
                 }
             }
 
@@ -529,9 +525,6 @@ public abstract class ProcessorReifier<T extends ProcessorDefinition<?>> {
         // resolve properties before we create the processor
         ProcessorDefinitionHelper.resolvePropertyPlaceholders(routeContext.getCamelContext(), definition);
 
-        // resolve constant fields (eg Exchange.FILE_NAME)
-        ProcessorDefinitionHelper.resolveKnownConstantFields(routeContext.getCamelContext(), definition);
-
         // also resolve properties and constant fields on embedded expressions
         ProcessorDefinition<?> me = definition;
         if (me instanceof ExpressionNode) {
@@ -540,9 +533,6 @@ public abstract class ProcessorReifier<T extends ProcessorDefinition<?>> {
             if (expressionDefinition != null) {
                 // resolve properties before we create the processor
                 ProcessorDefinitionHelper.resolvePropertyPlaceholders(routeContext.getCamelContext(), expressionDefinition);
-
-                // resolve constant fields (eg Exchange.FILE_NAME)
-                ProcessorDefinitionHelper.resolveKnownConstantFields(routeContext.getCamelContext(), expressionDefinition);
             }
         }
 

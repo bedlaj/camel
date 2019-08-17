@@ -50,7 +50,7 @@ You can append query options to the URI in the following format,
 == Options
 
 // component options: START
-The Netty component supports 7 options, which are listed below.
+The Netty component supports 6 options, which are listed below.
 
 
 
@@ -62,7 +62,6 @@ The Netty component supports 7 options, which are listed below.
 | *executorService* (advanced) | To use the given EventExecutorGroup. |  | EventExecutorGroup
 | *useGlobalSslContext Parameters* (security) | Enable usage of global SSL context parameters. | false | boolean
 | *sslContextParameters* (security) | To configure security using SSLContextParameters |  | SSLContextParameters
-| *resolveProperty Placeholders* (advanced) | Whether the component should resolve property placeholders on itself when starting. Only properties which are of String type can use property placeholders. | true | boolean
 | *basicPropertyBinding* (advanced) | Whether the component should use basic property binding (Camel 2.x) or the newer property binding with additional capabilities | false | boolean
 |===
 // component options: END
@@ -187,7 +186,7 @@ When using Spring Boot make sure to use the following Maven dependency to have s
 ----
 
 
-The component supports 79 options, which are listed below.
+The component supports 78 options, which are listed below.
 
 
 
@@ -264,7 +263,6 @@ The component supports 79 options, which are listed below.
 | *camel.component.netty.enabled* | Whether to enable auto configuration of the netty component. This is enabled by default. |  | Boolean
 | *camel.component.netty.executor-service* | To use the given EventExecutorGroup. The option is a io.netty.util.concurrent.EventExecutorGroup type. |  | String
 | *camel.component.netty.maximum-pool-size* | The thread pool size for the EventExecutorGroup if its in use. The default value is 16. | 16 | Integer
-| *camel.component.netty.resolve-property-placeholders* | Whether the component should resolve property placeholders on itself when starting. Only properties which are of String type can use property placeholders. | true | Boolean
 | *camel.component.netty.ssl-context-parameters* | To configure security using SSLContextParameters. The option is a org.apache.camel.support.jsse.SSLContextParameters type. |  | String
 | *camel.component.netty.use-global-ssl-context-parameters* | Enable usage of global SSL context parameters. | false | Boolean
 | *camel.component.netty.configuration.client-pipeline-factory* | *Deprecated*  |  | ClientInitializer Factory
@@ -528,24 +526,24 @@ be resolved when the endpoint is created.
 [source,java]
 ----
 ChannelHandlerFactory lengthDecoder = ChannelHandlerFactories.newLengthFieldBasedFrameDecoder(1048576, 0, 4, 0, 4);
- 
+
 StringDecoder stringDecoder = new StringDecoder();
 registry.bind("length-decoder", lengthDecoder);
 registry.bind("string-decoder", stringDecoder);
- 
+
 LengthFieldPrepender lengthEncoder = new LengthFieldPrepender(4);
 StringEncoder stringEncoder = new StringEncoder();
 registry.bind("length-encoder", lengthEncoder);
 registry.bind("string-encoder", stringEncoder);
- 
+
 List<ChannelHandler> decoders = new ArrayList<ChannelHandler>();
 decoders.add(lengthDecoder);
 decoders.add(stringDecoder);
- 
+
 List<ChannelHandler> encoders = new ArrayList<ChannelHandler>();
 encoders.add(lengthEncoder);
 encoders.add(stringEncoder);
- 
+
 registry.bind("encoders", encoders);
 registry.bind("decoders", decoders);
 ----
@@ -556,7 +554,7 @@ lists in an application context
 [source,xml]
 ----
 <util:list id="decoders" list-class="java.util.LinkedList">
-        <bean class="org.apache.camel.component.netty4.ChannelHandlerFactories" factory-method="newLengthFieldBasedFrameDecoder">
+        <bean class="org.apache.camel.component.netty.ChannelHandlerFactories" factory-method="newLengthFieldBasedFrameDecoder">
             <constructor-arg value="1048576"/>
             <constructor-arg value="0"/>
             <constructor-arg value="4"/>
@@ -578,7 +576,7 @@ lists in an application context
     </bean>
     <bean id="string-encoder" class="io.netty.handler.codec.string.StringEncoder"/>
 
-    <bean id="length-decoder" class="org.apache.camel.component.netty4.ChannelHandlerFactories" factory-method="newLengthFieldBasedFrameDecoder">
+    <bean id="length-decoder" class="org.apache.camel.component.netty.ChannelHandlerFactories" factory-method="newLengthFieldBasedFrameDecoder">
         <constructor-arg value="1048576"/>
         <constructor-arg value="0"/>
         <constructor-arg value="4"/>
@@ -594,7 +592,7 @@ a comma separated list or contained in a List e.g.
 [source,java]
 ----
  from("direct:multiple-codec").to("netty:tcp://0.0.0.0:{{port}}?encoders=#encoders&sync=false");
-                
+
  from("netty:tcp://0.0.0.0:{{port}}?decoders=#length-decoder,#string-decoder&sync=false").to("mock:multiple-codec");
 ----
 
@@ -740,9 +738,9 @@ using the `NettyWorkerPoolBuilder` with 2 worker threads as shown below:
 ----
 
 TIP: For boss thread pool there is a
-`org.apache.camel.component.netty4.NettyServerBossPoolBuilder` builder
+`org.apache.camel.component.netty.NettyServerBossPoolBuilder` builder
 for Netty consumers, and a
-`org.apache.camel.component.netty4.NettyClientBossPoolBuilder` for the
+`org.apache.camel.component.netty.NettyClientBossPoolBuilder` for the
 Netty producers.
 
 Then in the Camel routes we can refer to this worker pools by
@@ -794,7 +792,3 @@ This provides support for timeout and other complexities you otherwise would nee
 You can find an example with the Apache Camel source code in the examples directory
 under the `camel-example-netty-custom-correlation` directory.
 
-== See Also
-
-* xref:netty-http-component.adoc[Netty HTTP]
-* xref:mina-component.adoc[MINA]

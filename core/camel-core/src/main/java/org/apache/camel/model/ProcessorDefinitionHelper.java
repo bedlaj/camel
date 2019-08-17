@@ -22,18 +22,23 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import javax.xml.namespace.QName;
 
 import org.apache.camel.CamelContext;
 import org.apache.camel.Exchange;
+import org.apache.camel.ExchangeConstantProvider;
 import org.apache.camel.NamedNode;
+import org.apache.camel.RuntimeCamelException;
 import org.apache.camel.spi.ExecutorServiceManager;
 import org.apache.camel.spi.PropertiesComponent;
+import org.apache.camel.spi.PropertyPlaceholderConfigurer;
 import org.apache.camel.spi.RouteContext;
-import org.apache.camel.support.IntrospectionSupport;
 import org.apache.camel.support.PropertyBindingSupport;
 import org.apache.camel.util.ObjectHelper;
 import org.apache.camel.util.StringHelper;
@@ -628,12 +633,8 @@ public final class ProcessorDefinitionHelper {
         return rc;
     }
 
-    private static void addRestoreAction(final Object target, final Map<String, Object> properties) {
-        addRestoreAction(null, target, properties);
-    }
-    
-    private static void addRestoreAction(final CamelContext context, final Object target, final Map<String, Object> properties) {
-        if (properties.isEmpty()) {
+    private static void addRestoreAction(Map<String, Consumer<String>> writeProperties, final Map<String, String> properties) {
+        if (properties == null || properties.isEmpty()) {
             return;
         }
 
@@ -646,10 +647,9 @@ public final class ProcessorDefinitionHelper {
             @Override
             public void run() {
                 try {
-                    // do not use property placeholders as we want to preserve the text as-is when we restore
-                    PropertyBindingSupport.build()
-                            .withPlaceholder(false).withNesting(false).withReference(false)
-                            .bind(context, target, properties);
+                    properties.forEach((k, v) -> {
+                        writeProperties.get(k).accept(v);
+                    });
                 } catch (Exception e) {
                     LOG.warn("Cannot restore definition properties. This exception is ignored.", e);
                 }
@@ -670,7 +670,10 @@ public final class ProcessorDefinitionHelper {
      * Inspects the given definition and resolves any property placeholders from its properties.
      * <p/>
      * This implementation will check all the getter/setter pairs on this instance and for all the values
-     * (which is a String type) will be property placeholder resolved. The definition should implement {@link OtherAttributesAware}
+     * (which is a String type) will be property placeholder resolved.
+     * Additional properties are also resolved if the definition implements {@link OtherAttributesAware}.
+     * Also known constant fields on {@link Exchange} is replaced with their actual constant value, eg
+     * <tt>Exchange.FILE_NAME</tt> is replaced with <tt>CamelFileName</tt>.
      *
      * @param camelContext the Camel context
      * @param definition   the definition which should implement {@link OtherAttributesAware}
@@ -678,122 +681,109 @@ public final class ProcessorDefinitionHelper {
      * @see org.apache.camel.CamelContext#resolvePropertyPlaceholders(String)
      * @see org.apache.camel.component.properties.PropertiesComponent
      */
+    @SuppressWarnings("unchecked")
     public static void resolvePropertyPlaceholders(CamelContext camelContext, Object definition) throws Exception {
         LOG.trace("Resolving property placeholders for: {}", definition);
 
+        // only do this for models that supports property placeholders
+        if (!(definition instanceof PropertyPlaceholderConfigurer)) {
+            return;
+        }
+
+        PropertyPlaceholderConfigurer ppa = (PropertyPlaceholderConfigurer) definition;
+
         // find all getter/setter which we can use for property placeholders
-        Map<String, Object> properties = new HashMap<>();
-        IntrospectionSupport.getProperties(definition, properties, null);
+        Map<String, String> changedProperties = new HashMap<>();
+        Map<String, Supplier<String>> readProperties = ppa.getReadPropertyPlaceholderOptions(camelContext);
+        Map<String, Consumer<String>> writeProperties = ppa.getWritePropertyPlaceholderOptions(camelContext);
 
-        OtherAttributesAware other = null;
+        // definitions may have additional placeholder properties (can typically be used by the XML DSL to
+        // allow to configure using placeholders for properties that are not xs:string types)
         if (definition instanceof OtherAttributesAware) {
-            other = (OtherAttributesAware) definition;
-        }
-        // include additional properties which have the Camel placeholder QName
-        // and when the definition parameter is this (otherAttributes belong to this)
-        if (other != null && other.getOtherAttributes() != null) {
-            for (QName key : other.getOtherAttributes().keySet()) {
-                if (Constants.PLACEHOLDER_QNAME.equals(key.getNamespaceURI())) {
-                    String local = key.getLocalPart();
-                    Object value = other.getOtherAttributes().get(key);
-                    if (value instanceof String) {
-                        // enforce a properties component to be created if none existed
-                        camelContext.getPropertiesComponent(true);
+            OtherAttributesAware ooa = (OtherAttributesAware) definition;
 
-                        // value must be enclosed with placeholder tokens
-                        String s = (String) value;
-                        String prefixToken = PropertiesComponent.PREFIX_TOKEN;
-                        String suffixToken = PropertiesComponent.SUFFIX_TOKEN;
-
-                        if (!s.startsWith(prefixToken)) {
-                            s = prefixToken + s;
-                        }
-                        if (!s.endsWith(suffixToken)) {
-                            s = s + suffixToken;
-                        }
-                        value = s;
-                    }
-                    properties.put(local, value);
+            if (ooa.getOtherAttributes() != null && !ooa.getOtherAttributes().isEmpty()) {
+                Map<String, Supplier<String>> extraRead = new HashMap<>();
+                if (readProperties != null && !readProperties.isEmpty()) {
+                    extraRead.putAll(readProperties);
                 }
-            }
-        }
-
-        Map<String, Object> changedProperties = new HashMap<>();
-        if (!properties.isEmpty()) {
-            LOG.trace("There are {} properties on: {}", properties.size(), definition);
-            // lookup and resolve properties for String based properties
-            for (Map.Entry<String, Object> entry : properties.entrySet()) {
-                // the name is always a String
-                String name = entry.getKey();
-                Object value = entry.getValue();
-                if (value instanceof String) {
-                    // value must be a String, as a String is the key for a property placeholder
-                    String text = (String) value;
-                    text = camelContext.resolvePropertyPlaceholders(text);
-                    if (text != value) {
-                        // invoke setter as the text has changed
-                        boolean changed = IntrospectionSupport.setProperty(camelContext.getTypeConverter(), definition, name, text);
-                        if (!changed) {
-                            throw new IllegalArgumentException("No setter to set property: " + name + " to: " + text + " on: " + definition);
-                        }
-                        changedProperties.put(name, value);
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("Changed property [{}] from: {} to: {}", name, value, text);
-                        }
-                    }
+                Map<String, Consumer<String>> extraWrite = new HashMap<>();
+                if (writeProperties != null && !writeProperties.isEmpty()) {
+                    extraWrite.putAll(writeProperties);
                 }
-            }
-        }
-        addRestoreAction(camelContext, definition, changedProperties);
-    }
 
-    /**
-     * Inspects the given definition and resolves known fields
-     * <p/>
-     * This implementation will check all the getter/setter pairs on this instance and for all the values
-     * (which is a String type) will check if it refers to a known field (such as on Exchange).
-     *
-     * @param camelContext the camel context
-     * @param definition   the definition
-     */
-    public static void resolveKnownConstantFields(CamelContext camelContext, Object definition) throws Exception {
-        LOG.trace("Resolving known fields for: {}", definition);
+                Map<QName, Object> other = ooa.getOtherAttributes();
+                other.forEach((k, v) -> {
+                    if (Constants.PLACEHOLDER_QNAME.equals(k.getNamespaceURI())) {
+                        if (v instanceof String) {
+                            // enforce a properties component to be created if none existed
+                            camelContext.getPropertiesComponent(true);
 
-        // find all String getter/setter
-        Map<String, Object> properties = new HashMap<>();
-        IntrospectionSupport.getProperties(definition, properties, null);
+                            // value must be enclosed with placeholder tokens
+                            String s = (String) v;
+                            String prefixToken = PropertiesComponent.PREFIX_TOKEN;
+                            String suffixToken = PropertiesComponent.SUFFIX_TOKEN;
 
-        Map<String, Object> changedProperties = new HashMap<>();
-        if (!properties.isEmpty()) {
-            LOG.trace("There are {} properties on: {}", properties.size(), definition);
-
-            // lookup and resolve known constant fields for String based properties
-            for (Map.Entry<String, Object> entry : properties.entrySet()) {
-                String name = entry.getKey();
-                Object value = entry.getValue();
-                if (value instanceof String) {
-                    // we can only resolve String typed values
-                    String text = (String) value;
-
-                    // is the value a known field (currently we only support constants from Exchange.class)
-                    if (text.startsWith("Exchange.")) {
-                        String field = StringHelper.after(text, "Exchange.");
-                        String constant = ObjectHelper.lookupConstantFieldValue(Exchange.class, field);
-                        if (constant != null) {
-                            // invoke setter as the text has changed
-                            IntrospectionSupport.setProperty(camelContext, definition, name, constant);
-                            changedProperties.put(name, value);
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Changed property [{}] from: {} to: {}", name, value, constant);
+                            if (!s.startsWith(prefixToken)) {
+                                s = prefixToken + s;
                             }
-                        } else {
-                            throw new IllegalArgumentException("Constant field with name: " + field + " not found on Exchange.class");
+                            if (!s.endsWith(suffixToken)) {
+                                s = s + suffixToken;
+                            }
+                            final String value = s;
+                            extraRead.put(k.getLocalPart(), () -> value);
+                            extraWrite.put(k.getLocalPart(), text -> {
+                                try {
+                                    PropertyBindingSupport.build()
+                                            .withCamelContext(camelContext)
+                                            .withTarget(definition)
+                                            .withMandatory(true)
+                                            .withProperty(k.getLocalPart(), text)
+                                            .bind();
+                                } catch (Exception e) {
+                                    throw RuntimeCamelException.wrapRuntimeException(e);
+                                }
+                            });
                         }
+                    }
+                });
+                readProperties = extraRead;
+                writeProperties = extraWrite;
+            }
+        }
+
+        if (readProperties != null && !readProperties.isEmpty()) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("There are {} properties on: {}", readProperties.size(), definition);
+            }
+
+            // lookup and resolve properties for String based properties
+            for (Map.Entry<String, Supplier<String>> entry : readProperties.entrySet()) {
+                String name = entry.getKey();
+                String value = entry.getValue().get();
+                String text = camelContext.resolvePropertyPlaceholders(value);
+
+                // is the value a known field (currently we only support constants from Exchange.class)
+                if (text != null && text.startsWith("Exchange.")) {
+                    String field = StringHelper.after(text, "Exchange.");
+                    String constant = ExchangeConstantProvider.lookup(field);
+                    if (constant != null) {
+                        text = constant;
+                    } else {
+                        throw new IllegalArgumentException("Constant field with name: " + field + " not found on Exchange.class");
+                    }
+                }
+
+                if (!Objects.equals(text, value)) {
+                    writeProperties.get(name).accept(text);
+                    changedProperties.put(name, value);
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Changed property [{}] from: {} to: {}", name, value, text);
                     }
                 }
             }
         }
-        addRestoreAction(definition, changedProperties);
+        addRestoreAction(writeProperties, changedProperties);
     }
 
 }

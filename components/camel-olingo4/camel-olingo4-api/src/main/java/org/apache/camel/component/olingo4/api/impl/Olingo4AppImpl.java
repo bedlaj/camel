@@ -311,6 +311,13 @@ public final class Olingo4AppImpl implements Olingo4App {
         writeContent(edm, new HttpPost(createUri(SegmentType.BATCH.getValue(), null)), uriInfo, data, endpointHttpHeaders, responseHandler);
     }
 
+    @Override
+    public <T> void action(final Edm edm, final String resourcePath, final Map<String, String> endpointHttpHeaders, final Object data, final Olingo4ResponseHandler<T> responseHandler) {
+        final UriInfo uriInfo = parseUri(edm, resourcePath, null, serviceUri);
+
+        writeContent(edm, new HttpPost(createUri(resourcePath, null)), uriInfo, data, endpointHttpHeaders, responseHandler);
+    }
+
     private ContentType getResourceContentType(UriInfo uriInfo) {
         ContentType resourceContentType;
         switch (uriInfo.getKind()) {
@@ -478,6 +485,7 @@ public final class Olingo4AppImpl implements Olingo4App {
                             List<UriResource> listResource = uriInfo.getUriResourceParts();
                             UriResourceKind lastResourceKind = listResource.get(listResource.size() - 1).getKind();
                             switch (lastResourceKind) {
+                            case action:
                             case entitySet:
                                 ClientEntity entity = odataReader.readEntity(result.getEntity().getContent(),
                                                                              ContentType.parse(result.getEntity().getContentType().getValue()));
@@ -504,50 +512,68 @@ public final class Olingo4AppImpl implements Olingo4App {
     }
 
     private AbstractHttpEntity writeContent(final Edm edm, final UriInfo uriInfo, final Object content) throws ODataException {
-        InputStream requestStream = null;
-        AbstractHttpEntity httpEntity = null;
+        AbstractHttpEntity httpEntity;
+
         if (uriInfo.getKind() == UriInfoKind.resource) {
             // any resource entity
             List<UriResource> listResource = uriInfo.getUriResourceParts();
             UriResourceKind lastResourceKind = listResource.get(listResource.size() - 1).getKind();
             switch (lastResourceKind) {
-            case entitySet:
-                if (content instanceof ClientEntity) {
-                    requestStream = odataWriter.writeEntity((ClientEntity)content, getResourceContentType(uriInfo));
-                } else if (content instanceof String) {
-                    httpEntity = new StringEntity((String) content, org.apache.http.entity.ContentType.APPLICATION_JSON);
-                    httpEntity.setChunked(false);
-                    return httpEntity;
+            case action:
+                if (content == null) { // actions may have no input
+                    httpEntity = new ByteArrayEntity(new byte[0]);
                 } else {
-                    throw new ODataException("Unsupported content type: " + content);
+                    httpEntity = writeContent(uriInfo, content);
                 }
+                break;
+            case entitySet:
+                httpEntity = writeContent(uriInfo, content);
                 break;
             default:
                 throw new ODataException("Unsupported resource type: " + lastResourceKind);
             }
-            try {
-                httpEntity = new ByteArrayEntity(IOUtils.toByteArray(requestStream));
-            } catch (IOException e) {
-                throw new ODataException("Error during converting input stream to byte array", e);
-            }
-            httpEntity.setChunked(false);
-
         } else if (uriInfo.getKind() == UriInfoKind.batch) {
             final String boundary = BOUNDARY_PREFIX + UUID.randomUUID();
             final String contentHeader = BATCH_CONTENT_TYPE + BOUNDARY_PARAMETER + boundary;
-            final List<Olingo4BatchRequest> batchParts = (List<Olingo4BatchRequest>)content;
+            final List<Olingo4BatchRequest> batchParts = (List<Olingo4BatchRequest>) content;
 
-            requestStream = serializeBatchRequest(edm, batchParts, BOUNDARY_DOUBLE_DASH + boundary);
-            try {
-                httpEntity = new ByteArrayEntity(IOUtils.toByteArray(requestStream));
-            } catch (IOException e) {
-                throw new ODataException("Error during converting input stream to byte array", e);
-            }
-            httpEntity.setChunked(false);
+            final InputStream requestStream = serializeBatchRequest(edm, batchParts, BOUNDARY_DOUBLE_DASH + boundary);
+            httpEntity = writeContent(requestStream);
             httpEntity.setContentType(contentHeader);
         } else {
             throw new ODataException("Unsupported resource type: " + uriInfo.getKind().name());
         }
+
+        return httpEntity;
+    }
+
+    private AbstractHttpEntity writeContent(UriInfo uriInfo, Object content) throws ODataException {
+        AbstractHttpEntity httpEntity;
+
+        if (content instanceof ClientEntity) {
+            final InputStream requestStream = odataWriter.writeEntity((ClientEntity) content, getResourceContentType(uriInfo));
+            httpEntity = writeContent(requestStream);
+        } else if (content instanceof String) {
+            httpEntity = new StringEntity((String) content, org.apache.http.entity.ContentType.APPLICATION_JSON);
+        } else {
+            throw new ODataException("Unsupported content type: " + content);
+        }
+
+        httpEntity.setChunked(false);
+
+        return httpEntity;
+    }
+
+    private AbstractHttpEntity writeContent(InputStream inputStream) throws ODataException {
+        AbstractHttpEntity httpEntity;
+        
+        try {
+            httpEntity = new ByteArrayEntity(IOUtils.toByteArray(inputStream));
+        } catch (IOException e) {
+            throw new ODataException("Error during converting input stream to byte array", e);
+        }
+
+        httpEntity.setChunked(false);
 
         return httpEntity;
     }

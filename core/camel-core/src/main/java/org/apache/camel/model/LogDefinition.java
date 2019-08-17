@@ -51,6 +51,7 @@ public class LogDefinition extends NoOutputDefinition<LogDefinition> {
     }
 
     public LogDefinition(String message) {
+        this();
         this.message = message;
     }
 
@@ -136,4 +137,5 @@ public class LogDefinition extends NoOutputDefinition<LogDefinition> {
     public void setLogger(Logger logger) {
         this.logger = logger;
     }
+
 }

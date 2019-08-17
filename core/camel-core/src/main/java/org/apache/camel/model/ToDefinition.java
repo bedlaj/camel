@@ -40,14 +40,17 @@ public class ToDefinition extends SendDefinition<ToDefinition> {
     }
 
     public ToDefinition(String uri) {
+        this();
         setUri(uri);
     }
 
     public ToDefinition(Endpoint endpoint) {
+        this();
         setEndpoint(endpoint);
     }
 
     public ToDefinition(EndpointProducerBuilder endpointDefinition) {
+        this();
         setEndpointProducerBuilder(endpointDefinition);
     }
 
@@ -89,3 +92,4 @@ public class ToDefinition extends SendDefinition<ToDefinition> {
     }
 
 }
+

@@ -44,14 +44,17 @@ public class FromDefinition extends OptionalIdentifiedDefinition<FromDefinition>
     }
 
     public FromDefinition(String uri) {
+        this();
         setUri(uri);
     }
 
     public FromDefinition(Endpoint endpoint) {
+        this();
         setEndpoint(endpoint);
     }
 
     public FromDefinition(EndpointConsumerBuilder endpointConsumerBuilder) {
+        this();
         setEndpointConsumerBuilder(endpointConsumerBuilder);
     }
 
