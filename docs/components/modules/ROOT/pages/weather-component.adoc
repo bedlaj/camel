@@ -56,7 +56,7 @@ The Weather component supports 3 options, which are listed below.
 |===
 | Name | Description | Default | Type
 | *geolocationAccessKey* (common) | The geolocation service now needs an accessKey to be used |  | String
-| *geolocationRequestHost IP* (common) | The geolocation service now needs to specify the IP associated to the accessKey you're using |  | String
+| *geolocationRequestHostIP* (common) | The geolocation service now needs to specify the IP associated to the accessKey you're using |  | String
 | *basicPropertyBinding* (advanced) | Whether the component should use basic property binding (Camel 2.x) or the newer property binding with additional capabilities | false | boolean
 |===
 // component options: END

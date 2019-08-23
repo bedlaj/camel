@@ -94,7 +94,7 @@ The Splunk component supports 2 options, which are listed below.
 [width="100%",cols="2,5,^1,2",options="header"]
 |===
 | Name | Description | Default | Type
-| *splunkConfiguration Factory* (advanced) | To use the SplunkConfigurationFactory |  | SplunkConfiguration Factory
+| *splunkConfigurationFactory* (advanced) | To use the SplunkConfigurationFactory |  | SplunkConfiguration Factory
 | *basicPropertyBinding* (advanced) | Whether the component should use basic property binding (Camel 2.x) or the newer property binding with additional capabilities | false | boolean
 |===
 // component options: END

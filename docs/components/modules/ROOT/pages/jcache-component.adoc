@@ -115,7 +115,7 @@ The JCache component supports 5 options, which are listed below.
 | Name | Description | Default | Type
 | *cachingProvider* (common) | The fully qualified class name of the javax.cache.spi.CachingProvider |  | String
 | *cacheConfiguration* (common) | A Configuration for the Cache |  | Configuration
-| *cacheConfiguration Properties* (common) | The Properties for the javax.cache.spi.CachingProvider to create the CacheManager |  | Properties
+| *cacheConfigurationProperties* (common) | The Properties for the javax.cache.spi.CachingProvider to create the CacheManager |  | Properties
 | *configurationUri* (common) | An implementation specific URI for the CacheManager |  | String
 | *basicPropertyBinding* (advanced) | Whether the component should use basic property binding (Camel 2.x) or the newer property binding with additional capabilities | false | boolean
 |===
