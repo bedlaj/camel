@@ -53,13 +53,9 @@ jobs:
       uses: actions/setup-java@v1
       with:
         java-version: ${{ matrix.java }}
-    - name: Cache Maven Repository
+    - name: mvn build
       if: steps.check.outputs.triggered == 'true'
-      uses: actions/cache@v1
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-m2
-    - name: mvn full build
+      run: ./mvnw -U -e -fae -V -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=120 --no-transfer-progress -Pfastinstall -DskipTests clean install
+    - name: mvn test
       if: steps.check.outputs.triggered == 'true'
-      run: ./mvnw -U -e -fae -V -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=120 --no-transfer-progress clean install
+      run: ./mvnw -o -e -V test
