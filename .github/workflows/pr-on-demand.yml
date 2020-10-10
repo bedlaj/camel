@@ -58,4 +58,4 @@ jobs:
       run: ./mvnw -U -e -fae -V -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=120 --no-transfer-progress -Pfastinstall -DskipTests clean install
     - name: mvn test
       if: steps.check.outputs.triggered == 'true'
-      run: ./mvnw -T 2 -o -e -V test
+      run: ./mvnw -T 2 -o -e -V install
