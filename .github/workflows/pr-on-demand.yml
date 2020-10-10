@@ -39,6 +39,15 @@ jobs:
     - name: Checkout
       if: steps.check.outputs.triggered == 'true'
       uses: actions/checkout@v1
+    - name: Checkout Pull Request
+      if: steps.check.outputs.triggered == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        PR_URL="${{ github.event.issue.pull_request.url }}"
+        PR_NUM=${PR_URL##*/}
+        echo "Checking out from PR #$PR_NUM based on URL: $PR_URL"
+        hub pr checkout $PR_NUM
     - name: Set up JDK ${{ matrix.java }}
       if: steps.check.outputs.triggered == 'true'
       uses: actions/setup-java@v1
