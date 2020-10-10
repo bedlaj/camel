@@ -1,0 +1,56 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+name: PR on demand action
+
+on:
+  pull_request:
+    types: [opened]
+  issue_comment:
+    types: [created]
+jobs:
+  full-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java: [ '1.8' ]
+    steps:
+    - uses: khan/pull-request-comment-trigger@1.0.0
+      id: check
+      with:
+        trigger: '#build/tests'
+        reaction: eyes
+      env:
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+    - name: Checkout
+      if: steps.check.outputs.triggered == 'true'
+      uses: actions/checkout@v1
+    - name: Set up JDK ${{ matrix.java }}
+      if: steps.check.outputs.triggered == 'true'
+      uses: actions/setup-java@v1
+      with:
+        java-version: ${{ matrix.java }}
+    - name: Cache Maven Repository
+      if: steps.check.outputs.triggered == 'true'
+      uses: actions/cache@v1
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+    - name: mvn full build
+      if: steps.check.outputs.triggered == 'true'
+      run: ./mvnw -U -e -fae -V -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=120 --no-transfer-progress clean install
